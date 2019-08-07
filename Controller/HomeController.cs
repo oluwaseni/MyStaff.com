@@ -58,6 +58,80 @@ namespace EmployeeManagement.Controllers
             return View();
         }
 
+        [HttpGet]
+        public ViewResult Edit(int Id)
+        {
+            Employee employee = _employeeRepository.GetEmployee(Id);
+            EmployeeEditViewModel employeeEditViewModel = new EmployeeEditViewModel
+            {
+                Id = employee.Id,
+                Name = employee.Name,
+                Email = employee.Email,
+                Department = employee.Department,
+                ExistingPhotoPath = employee.PhotoPath
+            };
+            return View(employeeEditViewModel);
+        }
+
+
+        [HttpPost]
+        public IActionResult Edit(EmployeeEditViewModel model)
+        {
+
+            if (ModelState.IsValid)
+            {
+                Employee employee = _employeeRepository.GetEmployee(model.Id);
+                employee.Name = model.Name;
+                employee.Email = model.Email;
+                employee.Department = model.Department;
+                if(model.Photo != null)
+                {
+                    if(model.ExistingPhotoPath != null)
+                    {
+                        string filePath = Path.Combine(hostingEnvironment.WebRootPath, "images", model.ExistingPhotoPath);
+                        //To delete the existing file
+
+                        System.IO.File.Delete(filePath);
+                    }
+                    //This is a method to check of a file or many files were chosen
+                    employee.PhotoPath = ProcessUpload(model);
+                }
+               
+
+
+                _employeeRepository.Update(employee);
+                return RedirectToAction("Index");
+            }
+            return View();
+        }
+        
+        
+        //This is the definition of a method to check if a file or many files were chosen
+
+        private string ProcessUpload(EmployeeCreateViewModel model)
+        {
+            string uniqueFilesName = null;
+
+            if (model.Photo != null)
+            {
+                //foreach (IFormFile Document in model.Photo)
+                //{
+                    string uploadsFolder = Path.Combine(hostingEnvironment.WebRootPath, "images");
+                    uniqueFilesName = Guid.NewGuid().ToString() + "_" + model.Photo.FileName;
+                    string filesPath = Path.Combine(uploadsFolder, uniqueFilesName);
+                    using(var filestream = new FileStream(filesPath, FileMode.Create))
+                    {
+                        model.Photo.CopyTo(filestream);
+                    }
+                    //Document.CopyTo(new FileStream(filesPath, FileMode.Create));
+                //}
+
+            }
+
+            return uniqueFilesName;
+        }
+
+
         //public RedirectToActionResult Create(Employee employee)
         //{
         //    Employee newEmployee = _employeeRepository.Add(employee);
@@ -68,35 +142,17 @@ namespace EmployeeManagement.Controllers
         {
             if (ModelState.IsValid)
             {
-                string uniqueFileName = null;
-                string uniqueFilesName = null;
-                if (model.Photo != null)
-                {
-                    string uploadsFolder = Path.Combine(hostingEnvironment.WebRootPath, "images");
-                    uniqueFileName = Guid.NewGuid().ToString() + "_" + model.Photo.FileName;
-                    string filePath = Path.Combine(uploadsFolder, uniqueFileName);
-                    model.Photo.CopyTo(new FileStream(filePath, FileMode.Create));
-                }
-
-                if (model.Documents != null && model.Documents.Count > 0)
-                {
-                    foreach(IFormFile Document in model.Documents)
-                    {
-                        string uploadsFolder = Path.Combine(hostingEnvironment.WebRootPath, "Documents");
-                        uniqueFilesName = Guid.NewGuid().ToString() + "_" + Document.FileName; 
-                        string filesPath = Path.Combine(uploadsFolder, uniqueFileName);
-                        Document.CopyTo(new FileStream(filesPath, FileMode.Create));
-                    }
-                   
-                }
+                //string uniqueFileName = null;
+                string uniqueFilesName = ProcessUpload(model);
+               
 
                 Employee anotherEmployee = new Employee
                 {
                     Name = model.Name,
                     Email = model.Email,
                     Department = model.Department,
-                    PhotoPath = uniqueFileName,
-                    Documents = uniqueFilesName
+                    PhotoPath = uniqueFilesName,
+                    //Documents = uniqueFilesName
                 };
 
                 _employeeRepository.Post(anotherEmployee);
